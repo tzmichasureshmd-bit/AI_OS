@@ -1,0 +1,67 @@
+# ===== TZMICHA AI OS - Git Ignore =====
+
+# Environment
+.env
+.env.local
+.env.development
+.env.production
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Docker
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Audio files (generated during testing)
+_tzmicha_voice.mp3
+*.mp3
+*.wav
+
+# Secrets
+*.pem
+*.key
+*.cert
+
+# Coverage & Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.nyc_output/
+
+# Build artifacts
+*.tar.gz
+*.zip
