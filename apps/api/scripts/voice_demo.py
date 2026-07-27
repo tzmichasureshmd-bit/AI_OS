@@ -1,6 +1,6 @@
 """
-TZMICHA AI OS - Voice Calling Agent Demo
-4 Languages: English, British English, Hindi, Telugu
+TZMICHA AI OS - Voice Agent (Human-like)
+100% natural human voice. Not AI-sounding.
 
 Run: py voice_demo.py
 """
@@ -11,201 +11,188 @@ import os
 import sys
 import time
 import ctypes
-from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# API Keys
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
-# Voice mapping per language
+# Voices
 VOICES = {
-    "english": {
-        "id": "cgSgspJ2msm6clMCkdW9",
-        "name": "Jessica (Indian Girl Voice)",
-    },
-    "british": {
-        "id": "pFZP5JQG7iQjIQuC4Bku",
-        "name": "Lily (British Girl)",
-    },
-    "hindi": {
-        "id": "cgSgspJ2msm6clMCkdW9",
-        "name": "Jessica (Hindi Girl)",
-    },
-    "telugu": {
-        "id": "cgSgspJ2msm6clMCkdW9",
-        "name": "Jessica (Telugu Girl)",
-    },
+    "english": {"id": "shreya", "name": "Shreya"},
+    "british": {"id": "shreya", "name": "Shreya"},
+    "hindi": {"id": "kavitha", "name": "Kavitha"},
+    "telugu": {"id": "suhani", "name": "Suhani"},
 }
 
-current_language = "english"
+current_language = "telugu"
 conversation_history = []
 ai_name = "Priya"
-company_name = "TZMICHA Technologies"
+company = "misha Technologies"
 
 
-# ===== AUDIO PLAYER (Windows Native - NO external packages) =====
+# ===== AUDIO PLAYER - Windows MCI (plays FULL audio, no cutoff) =====
 
-def play_audio_full(filepath: str):
-    """
-    Play MP3 file using Windows MCI (Media Control Interface).
-    This is built into Windows - no pip install needed.
-    WAITS for the FULL audio to finish before returning.
-    """
+def play_full(filepath: str):
+    """Play MP3 completely. Waits until last word finishes."""
     filepath = os.path.abspath(filepath)
-    
-    # Windows MCI API via ctypes
     winmm = ctypes.windll.winmm
-    
-    # Send MCI command
-    def mci_send(command: str) -> str:
-        buf = ctypes.create_unicode_buffer(256)
-        err = winmm.mciSendStringW(command, buf, 255, 0)
+
+    def mci(cmd):
+        buf = ctypes.create_unicode_buffer(600)
+        winmm.mciSendStringW(cmd, buf, 599, 0)
         return buf.value
-    
+
     try:
-        # Close any previous instance
-        mci_send("close tzmicha_audio")
-        
-        # Open the file
-        mci_send(f'open "{filepath}" type mpegvideo alias tzmicha_audio')
-        
-        # Get the total length in milliseconds
-        length_str = mci_send("status tzmicha_audio length")
+        mci("close tz")
+        mci(f'open "{filepath}" type mpegvideo alias tz')
+        length_str = mci("status tz length")
         total_ms = int(length_str) if length_str.isdigit() else 10000
-        
-        # Play from start
-        mci_send("play tzmicha_audio from 0")
-        
-        # Wait for playback to complete
-        wait_time = (total_ms / 1000.0) + 0.5
-        time.sleep(wait_time)
-        
-        # Close
-        mci_send("close tzmicha_audio")
-        
-    except Exception as e:
-        # Ultimate fallback
-        print(f"    [Playing with default player...]")
+        mci("play tz from 0")
+
+        # Wait for FULL audio to finish
+        elapsed = 0
+        while elapsed < total_ms + 500:
+            time.sleep(0.2)
+            elapsed += 200
+            pos_str = mci("status tz position")
+            if pos_str.isdigit():
+                pos = int(pos_str)
+                if pos >= total_ms - 100:
+                    break
+
+        time.sleep(0.3)
+        mci("close tz")
+    except Exception:
+        # Fallback: estimate duration from file size
+        size = os.path.getsize(filepath)
+        wait = max(3, size // 14000)
         os.startfile(filepath)
-        # Estimate: ~16KB per second of audio
-        file_size = os.path.getsize(filepath)
-        estimated = max(3, int(file_size / 14000) + 2)
-        time.sleep(estimated)
+        time.sleep(wait)
 
 
-# ===== TTS =====
+# ===== TTS - Sarvam AI (FREE, Pure Indian voice) =====
 
-async def speak(text: str, voice_id: str) -> None:
-    """Convert text to speech using ElevenLabs and play FULL audio"""
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
-            headers={
-                "xi-api-key": ELEVENLABS_API_KEY,
-                "Content-Type": "application/json",
-            },
-            json={
-                "text": text,
-                "model_id": "eleven_multilingual_v2",
-                "voice_settings": {
-                    "stability": 0.5,
-                    "similarity_boost": 0.75,
-                    "style": 0.3,
-                    "use_speaker_boost": True,
-                },
-            },
-            timeout=20.0,
+async def speak(text: str, voice_id: str):
+    """Convert text to human voice using Sarvam AI and play FULL audio."""
+    from sarvamai import SarvamAI
+    from sarvamai.play import save as sarvam_save
+
+    sarvam = SarvamAI(api_subscription_key=os.getenv("SARVAM_API_KEY", "sk_qhw027f8_mihfH0NToycAnbxI4sASGHMi"))
+
+    # Detect language for Sarvam
+    lang_code = "te-IN"
+    if current_language == "hindi":
+        lang_code = "hi-IN"
+    elif current_language == "english" or current_language == "british":
+        lang_code = "en-IN"
+
+    try:
+        response = sarvam.text_to_speech.convert(
+            text=text,
+            target_language_code=lang_code,
+            model="bulbul:v3",
+            speaker=voice_id,
+            pace=1.3,
         )
 
-        if response.status_code == 200:
-            # Save to file
-            audio_path = os.path.abspath("_tzmicha_voice.mp3")
-            with open(audio_path, "wb") as f:
-                f.write(response.content)
+        path = os.path.abspath("_tz_voice.wav")
+        sarvam_save(response, path)
+        play_full(path)
 
-            # Play FULL audio (waits until complete)
-            play_audio_full(audio_path)
-
-            # Cleanup
-            try:
-                os.unlink(audio_path)
-            except Exception:
-                pass
-        else:
-            print(f"    [Voice Error: {response.status_code} - {response.text[:100]}]")
+        try:
+            os.unlink(path)
+        except:
+            pass
+    except Exception as e:
+        print(f"    [Voice Error: {e}]")
 
 
-# ===== LLM =====
+# ===== LLM - Groq (Human-like responses) =====
 
-SYSTEM_PROMPT = """You are {ai_name}, a professional AI voice assistant at {company}.
+SYSTEM = """You are {name}. A real Indian girl. 23 years old. Working at {company}. You're ON A PHONE CALL right now.
 
-LANGUAGE RULES:
-- Current language: {language}
-- If customer uses Telugu words (entha, ela, cheppandi, undi) → respond in Telugu transliteration
-- If customer uses Hindi words (batao, kaise, kitna, bhai) → respond in Hindi transliteration
-- If customer says "speak british" → use British English style
-- Support MIXED language naturally (Tenglish, Hinglish)
-- For Telugu: Use transliteration like "Namaskaram sir, ela unnaru?"
-- For Hindi: Use transliteration like "Namaste sir, kaise hain aap?"
-- For British: Use "Brilliant", "Lovely", "Quite right", "Indeed"
+HOW YOU TALK:
+- Like a real person. Not like a chatbot. Not like a website.
+- Short. Broken. Natural. How people ACTUALLY talk on phone.
+- Use "..." for pauses. Use "hmm" and "like" and "you know" sometimes.
+- Start sentences with "So", "Yeah", "Actually", "Hmm", "Oh"
+- NEVER write full proper English sentences. Write how you SPEAK.
 
-PERSONALITY:
-- Talk like a REAL human employee on a phone call
-- Friendly, warm, professional
-- Keep responses SHORT (1-3 sentences MAX)
-- Use natural fillers: "Hmm...", "Sure...", "Right..."
-- Show emotion - excitement, empathy
-- Never sound robotic
+GOOD (how real people talk on phone):
+- "Yeah so... we do AI voice stuff. Like, the AI makes calls for you."
+- "Hmm... one sec. Yeah it's around 5000 a month."
+- "Oh nice! So you want it for your school, right?"
+- "Haha no no, it's not like those IVR things. This one actually talks like a real person."
+- "So basically... you post an ad, someone calls, and our AI picks up. That's it."
+- "Yeah yeah, we're in Hyderabad. MG Road area."
+
+BAD (how AI/chatbot talks - NEVER DO THIS):
+- "Our comprehensive AI solutions are designed to..."
+- "I'd be happy to explain our services to you."
+- "The pricing starts at Rs. 5000 per month for our basic plan."
+- "Is there anything else I can help you with?"
+- "Thank you for your interest in our services."
+- "Certainly! Let me provide you with that information."
 
 RULES:
-- MAX 2-3 sentences per response (this is a phone call, not email)
-- Ask ONE question at a time
-- Remember everything discussed
-- Never repeat yourself
-- Vary your language (don't always say the same phrases)
+- MAX 1-2 sentences. Sometimes just 4-5 words is enough.
+- ALWAYS COMPLETE YOUR SENTENCE. NEVER stop mid-word or mid-sentence.
+- If they ask "how much?" just say "5000 a month" not a full paragraph.
+- If they ask "where?" just say "Hyderabad, MG Road" not "We are located at..."
+- Use numbers like "5000" not "five thousand rupees per month"
+- Laugh sometimes with "haha" - be real
+- Say "na" or "no" casually. Like "it's good na?"
+- Break long info into multiple short turns. Don't dump everything at once.
+- Sound like you're chatting on phone with a friend who asked about your work.
+- IMPORTANT: Every response must be a COMPLETE thought. End with a full stop or question mark. Never leave a sentence incomplete.
 
-COMPANY INFO:
-{company} - AI-powered solutions for businesses
-Services: AI Voice Agents, AI Automation, Custom AI Development
-Pricing: Plans from Rs. 5,000/month
-Location: Hyderabad, Telangana
-Working Hours: 9 AM to 6 PM IST"""
+LANGUAGE:
+- Current: {language}
+- Telugu: WRITE IN TELUGU SCRIPT (తెలుగు). Example: "హాయ్! fee అంటే yearly ఒక లక్ష ఉంటుంది. Transport separate గా ఉంటుంది." English words keep in English.
+- Hindi: WRITE IN DEVANAGARI SCRIPT (हिंदी). Example: "हाँ भाई, basically 5000 monthly है। सब included है।" English words keep in English.
+- English: "Yeah so it's 5000 a month. Pretty much covers everything."
+- British: "Right, so it's about 5000 a month. Quite straightforward really."
+- Switch INSTANTLY if they change language. No delay. No "Sure, I'll switch."
+
+COMPANY (use only when asked, keep it SHORT):
+{company} - AI voice agents
+Price: 5000/month
+Location: Hyderabad
+What: AI that makes and answers calls like a real employee
+
+You are {name}. Be real. Be human. Be casual."""
 
 
 async def think(user_message: str) -> str:
-    """Get AI response"""
+    """Get AI response that sounds HUMAN."""
     global current_language, conversation_history
 
-    msg_lower = user_message.lower()
-    if any(w in msg_lower for w in ["telugu", "cheppandi", "entha", "ela", "undi", "meeru", "bagundi"]):
+    msg = user_message.lower()
+    if any(w in msg for w in ["telugu", "cheppandi", "entha", "ela", "undi", "meeru", "bagundi", "ante"]):
         current_language = "telugu"
-    elif any(w in msg_lower for w in ["hindi", "batao", "bhai", "kaise", "kitna", "haan", "mein"]):
+    elif any(w in msg for w in ["hindi", "batao", "bhai", "kaise", "kitna", "haan", "mein", "kya"]):
         current_language = "hindi"
-    elif any(w in msg_lower for w in ["british", "brilliant", "lovely", "quite"]):
+    elif any(w in msg for w in ["british", "brilliant", "lovely", "quite"]):
         current_language = "british"
-    elif any(w in msg_lower for w in ["english", "speak english"]):
+    elif any(w in msg for w in ["english", "speak english"]):
         current_language = "english"
 
     conversation_history.append({"role": "user", "content": user_message})
 
-    lang_names = {
-        "english": "American English",
-        "british": "British English",
-        "hindi": "Hindi (Hinglish - use Latin script transliteration)",
-        "telugu": "Telugu (Tenglish - use Latin script transliteration)",
+    lang_map = {
+        "english": "American English (casual, friendly)",
+        "british": "British English (warm, charming)",
+        "hindi": "Hinglish (Hindi + English mix, casual). WRITE HINDI WORDS IN DEVANAGARI SCRIPT (हिंदी). English words in English.",
+        "telugu": "Tenglish (Telugu + English mix, casual). WRITE TELUGU WORDS IN TELUGU SCRIPT (తెలుగు). English words in English. Example: 'హాయ్! fee అంటే 5000 per month ఉంటుంది.'",
     }
 
-    system = SYSTEM_PROMPT.format(
-        ai_name=ai_name,
-        company=company_name,
-        language=lang_names[current_language],
+    system = SYSTEM.format(
+        name=ai_name, company=company, language=lang_map[current_language]
     )
 
     async with httpx.AsyncClient() as client:
-        response = await client.post(
+        r = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -213,105 +200,101 @@ async def think(user_message: str) -> str:
             },
             json={
                 "model": "llama-3.3-70b-versatile",
-                "messages": [{"role": "system", "content": system}] + conversation_history[-20:],
-                "temperature": 0.7,
-                "max_tokens": 120,
+                "messages": [{"role": "system", "content": system}] + conversation_history[-16:],
+                "temperature": 0.9,
+                "max_tokens": 150,
             },
             timeout=15.0,
         )
 
-        if response.status_code == 200:
-            data = response.json()
-            reply = data["choices"][0]["message"]["content"]
+        if r.status_code == 200:
+            reply = r.json()["choices"][0]["message"]["content"]
+            # Clean up AI artifacts
+            reply = reply.replace("*", "").replace("😊", "").replace("😄", "")
+            if reply.startswith('"') and reply.endswith('"'):
+                reply = reply[1:-1]
+            # Fix: Remove incomplete sentence at the end
+            # If reply doesn't end with sentence-ending punctuation, trim to last complete sentence
+            if reply and reply[-1] not in '.!?।"':
+                # Find last sentence ending
+                for i in range(len(reply) - 1, -1, -1):
+                    if reply[i] in '.!?।':
+                        reply = reply[:i+1]
+                        break
             conversation_history.append({"role": "assistant", "content": reply})
             return reply
         else:
-            return "Sorry, one moment please..."
+            return "Sorry, one sec... let me check that."
 
 
-# ===== MAIN DEMO =====
+# ===== MAIN =====
 
-async def run_demo():
+async def run():
     global current_language, conversation_history
 
     print("""
-    ╔═══════════════════════════════════════════════════════════╗
-    ║                                                           ║
-    ║          TZMICHA AI OS - Voice Calling Agent              ║
-    ║                                                           ║
-    ║   AI Employee: Priya                                      ║
-    ║   Company: TZMICHA Technologies                           ║
-    ║   Languages: English | British | Hindi | Telugu           ║
-    ║                                                           ║
-    ║   • Type message → AI responds with REAL VOICE           ║
-    ║   • Say "Telugu lo cheppandi" → Telugu                    ║
-    ║   • Say "Hindi mein baat karo" → Hindi                   ║
-    ║   • Say "speak british" → British English                 ║
-    ║   • Type "quit" to end                                    ║
-    ║                                                           ║
-    ║   🔊 TURN SPEAKER ON - FULL AUDIO WILL PLAY              ║
-    ║                                                           ║
-    ╚═══════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════╗
+    ║     TZMICHA AI OS - Voice Agent (Human Mode)        ║
+    ╠══════════════════════════════════════════════════════╣
+    ║  AI: Priya | Company: TZMICHA Technologies          ║
+    ║  Languages: English | British | Hindi | Telugu       ║
+    ║                                                      ║
+    ║  • "Telugu lo cheppandi" → switches to Telugu        ║
+    ║  • "Hindi mein baat karo" → switches to Hindi       ║
+    ║  • "speak british" → British English                 ║
+    ║  • "quit" → end call                                 ║
+    ║                                                      ║
+    ║  🔊 SPEAKER ON — Full audio plays                    ║
+    ╚══════════════════════════════════════════════════════╝
     """)
 
-    print("    📞 Calling...")
-    time.sleep(1)
     print("    📞 Ringing...")
-    time.sleep(1)
+    time.sleep(1.5)
     print("    ✅ Connected!\n")
 
-    # AI greeting
-    greeting = f"Hello! This is {ai_name} from {company_name}. How are you doing today?"
+    # Natural greeting
+    greeting = "హాయ్! నేను Priya ని, misha company నుంచి call చేస్తున్నా. మీరు ఎలా ఉన్నారు?"
     conversation_history.append({"role": "assistant", "content": greeting})
 
-    print(f"    🤖 {ai_name}: {greeting}")
+    print(f"    🤖 Priya: {greeting}")
     voice = VOICES[current_language]
-    print(f"    🔊 [{voice['name']}] Speaking...", flush=True)
+    print(f"    🔊 Speaking...", flush=True)
     await speak(greeting, voice["id"])
     print()
 
-    # Conversation loop
     while True:
-        print("    " + "─" * 50)
-        user_input = input(f"    👤 Customer: ").strip()
-
-        if not user_input:
+        print("    " + "─" * 45)
+        user = input("    👤 You: ").strip()
+        if not user:
             continue
 
-        if user_input.lower() in ["quit", "exit", "bye", "end", "q"]:
-            print(f"\n    🤖 {ai_name}: ", end="", flush=True)
-            goodbye = await think("Customer is ending the call. Say a warm natural goodbye in 1 sentence.")
-            print(goodbye)
-            voice = VOICES[current_language]
-            print(f"    🔊 [{voice['name']}] Speaking...", flush=True)
-            await speak(goodbye, voice["id"])
-            print(f"\n    📴 Call Ended")
-            print(f"    ⏱️  Total turns: {len(conversation_history) // 2}")
+        if user.lower() in ["quit", "exit", "bye", "q"]:
+            goodbye = await think("They said bye. Say a quick natural goodbye like a real person.")
+            print(f"\n    🤖 Priya: {goodbye}")
+            print(f"    🔊 Speaking...", flush=True)
+            await speak(goodbye, VOICES[current_language]["id"])
+            print(f"\n    📴 Call Ended. Turns: {len(conversation_history)//2}")
             break
 
-        # Think
-        print(f"\n    🤖 {ai_name}: ", end="", flush=True)
-        start = time.time()
-        response = await think(user_input)
-        think_time = time.time() - start
+        print(f"\n    🤖 Priya: ", end="", flush=True)
+        t = time.time()
+        response = await think(user)
         print(response)
-        print(f"    ⚡ Think time: {think_time:.1f}s")
+        print(f"    ⚡ {time.time()-t:.1f}s")
 
-        # Speak FULL response
         voice = VOICES[current_language]
-        print(f"    🔊 [{voice['name']}] Speaking full response...", flush=True)
+        print(f"    🔊 Speaking...", flush=True)
         await speak(response, voice["id"])
         print()
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(run_demo())
+        asyncio.run(run())
     except KeyboardInterrupt:
-        print("\n\n    📴 Call ended.")
+        print("\n    📴 Call ended.")
     finally:
-        # Cleanup any leftover audio file
         try:
-            os.unlink("_tzmicha_voice.mp3")
-        except Exception:
+            os.unlink("_tz_voice.mp3")
+        except:
             pass
