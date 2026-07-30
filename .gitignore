@@ -1,0 +1,17 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+deploy/.env
+*.db
+*.log
+*.wav
+*.mp3
+_tz_voice.*
+_voice_test.*
+_quick_test.*
+ngrok/
+ngrok.zip
+data/leads.db
+server.log
+backend/server.log

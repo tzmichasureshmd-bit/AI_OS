@@ -1,0 +1,61 @@
+# TZMICHA AI Voice - Production Docker Compose
+# Deploy: voice.tzmicha.com (frontend + backend)
+# Works with Traefik (already on your VPS)
+
+services:
+  # Backend API (FastAPI)
+  voice-backend:
+    build:
+      context: ..
+      dockerfile: deploy/backend.Dockerfile
+    container_name: voice-backend
+    restart: unless-stopped
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY:-}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - SERVER_PUBLIC_URL=https://voice.tzmicha.com
+    volumes:
+      - voice_data:/app/data
+    networks:
+      - voice-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Frontend (React + Nginx) - exposed via Traefik
+  voice-frontend:
+    build:
+      context: ..
+      dockerfile: deploy/frontend.Dockerfile
+    container_name: voice-frontend
+    restart: unless-stopped
+    depends_on:
+      voice-backend:
+        condition: service_healthy
+    networks:
+      - voice-net
+      - traefik-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.voice.rule=Host(`voice.tzmicha.com`)"
+      - "traefik.http.routers.voice.entrypoints=websecure"
+      - "traefik.http.routers.voice.tls.certresolver=myresolver"
+      - "traefik.http.services.voice.loadbalancer.server.port=80"
+
+volumes:
+  voice_data:
+    driver: local
+
+networks:
+  voice-net:
+    driver: bridge
+  traefik-net:
+    external: true
+    name: traefik-net
