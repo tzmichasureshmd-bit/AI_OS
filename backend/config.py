@@ -36,7 +36,9 @@ COLD_LEAD_SCORE = 0
 
 # Database
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, '..', 'data', 'leads.db')}"
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+DATABASE_URL = f"sqlite:///{os.path.join(DATA_DIR, 'leads.db')}"
 
 # Server
 HOST = "0.0.0.0"
