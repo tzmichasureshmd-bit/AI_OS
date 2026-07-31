@@ -412,29 +412,142 @@ def admin_reset_password(client_id: int, new_password: str, admin_key: str = Hea
     return {"message": f"Password reset for {client.company_name}"}
 
 
-# ===== VOICE CALLING (Real Phone Calls) =====
+# ===== AI URL ANALYZER (Auto-generate script from website) =====
+
+class AnalyzeURLRequest(BaseModel):
+    url: str
+
+@app.post("/ai/analyze-url")
+async def analyze_url(req: AnalyzeURLRequest, client: Client = Depends(get_current_client)):
+    """Scrape a company website and auto-generate AI calling script"""
+    import httpx as hx
+    from bs4 import BeautifulSoup
+
+    url = req.url.strip()
+    if not url.startswith("http"):
+        url = "https://" + url
+
+    # Step 1: Scrape the website
+    try:
+        async with hx.AsyncClient(follow_redirects=True, timeout=15.0) as http_client:
+            resp = await http_client.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            html = resp.text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not access website: {str(e)[:100]}")
+
+    # Step 2: Extract text from HTML
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        # Remove script and style elements
+        for tag in soup(["script", "style", "nav", "footer", "header"]):
+            tag.decompose()
+        text = soup.get_text(separator=" ", strip=True)
+        # Limit to first 3000 chars
+        text = text[:3000]
+        title = soup.title.string if soup.title else ""
+    except Exception:
+        text = html[:3000]
+        title = ""
+
+    # Step 3: Send to Groq to analyze and generate script
+    from groq import Groq
+    from config import GROQ_API_KEY, AI_MODEL
+    groq_client = Groq(api_key=GROQ_API_KEY)
+
+    prompt = f"""Analyze this company website content and generate an AI calling agent configuration.
+
+Website: {url}
+Title: {title}
+Content: {text}
+
+Generate a JSON response with these fields:
+- company_name: The company name
+- industry: One of: Real Estate, Education, Healthcare, Insurance, Finance, E-commerce, Restaurant, Hotel, Recruitment, Customer Support, Sales, Other
+- products: Brief description of what they sell/offer (2-3 lines)
+- pricing: Any pricing info found (or "Contact for pricing" if not found)
+- greeting: A natural phone greeting in Telugu+English mix (1 line). Example: "హాయ్! నేను Priya ని, ABC company నుంచి call చేస్తున్నా."
+- script: What the AI should talk about during the call (3-5 lines, include key selling points)
+- goals: What the AI should achieve on the call (2-3 goals like "Book site visit", "Collect budget info")
+- objections: Common objections and how to handle them (3 objections)
+- target_audience: Who would be calling/being called
+
+Respond ONLY in valid JSON. No markdown, no explanation."""
+
+    try:
+        response = groq_client.chat.completions.create(
+            model=AI_MODEL,
+            messages=[
+                {"role": "system", "content": "You analyze company websites and generate AI calling scripts. Respond only in valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=800
+        )
+        result_text = response.choices[0].message.content.strip()
+        # Clean up if wrapped in markdown
+        if "```" in result_text:
+            result_text = result_text.split("```")[1].replace("json", "").strip()
+        result = json.loads(result_text)
+        return {"status": "success", "data": result, "url": url}
+    except json.JSONDecodeError:
+        return {"status": "success", "data": {"company_name": title or url, "industry": "Other", "products": text[:200], "pricing": "Contact for pricing", "greeting": f"హాయ్! నేను Priya ని, {title or 'your company'} నుంచి call చేస్తున్నా.", "script": text[:300], "goals": "Qualify lead, Book appointment", "objections": "Handle pricing questions", "target_audience": "General"}, "url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI analysis failed: {str(e)[:100]}")
+
+
+# ===== VOICE CALLING (Exotel - Real Phone Calls) =====
+
+EXOTEL_SID = os.getenv("EXOTEL_SID", "tzmicha1")
+EXOTEL_API_KEY = os.getenv("EXOTEL_API_KEY", "")
+EXOTEL_API_TOKEN = os.getenv("EXOTEL_API_TOKEN", "")
+EXOTEL_CALLER_ID = os.getenv("EXOTEL_CALLER_ID", "09513886363")
 
 class VoiceCallRequest(BaseModel):
     lead_id: int
 
 @app.post("/voice/call")
 def initiate_voice_call(req: VoiceCallRequest, client: Client = Depends(get_current_client), db: Session = Depends(get_db)):
-    """Start a real AI phone call to a lead"""
-    if not VOICE_ENABLED:
-        raise HTTPException(status_code=501, detail="Voice calling not configured. Install twilio, deepgram-sdk, elevenlabs packages.")
+    """Start a real AI phone call to a lead via Exotel"""
     lead = db.query(Lead).filter(Lead.id == req.lead_id, Lead.client_id == client.id).first()
     if not lead: raise HTTPException(status_code=404, detail="Lead not found")
     if not lead.phone: raise HTTPException(status_code=400, detail="Lead has no phone number")
 
-    opening = generate_opening(lead.name, client.product_info or "our product")
-    result = make_call(lead.phone, lead.id, client.id, opening)
+    # Format phone number for Exotel (needs 0 prefix for Indian numbers)
+    phone = lead.phone.strip()
+    if phone.startswith("+91"):
+        phone = "0" + phone[3:]
+    elif not phone.startswith("0") and len(phone) == 10:
+        phone = "0" + phone
 
-    if "error" in result:
-        raise HTTPException(status_code=400, detail=result["error"])
+    # Exotel API call
+    if not EXOTEL_API_KEY or not EXOTEL_API_TOKEN:
+        # If no Exotel creds, just mark as calling (for demo)
+        lead.status = "calling"
+        db.commit()
+        return {"status": "demo_mode", "message": "Exotel credentials not set. Call simulated.", "lead_name": lead.name, "phone": lead.phone}
 
-    lead.status = "calling"
-    db.commit()
-    return result
+    import httpx as hx
+    try:
+        url = f"https://{EXOTEL_API_KEY}:{EXOTEL_API_TOKEN}@api.exotel.com/v1/Accounts/{EXOTEL_SID}/Calls/connect.json"
+        resp = hx.post(url, data={
+            "From": phone,
+            "CallerId": EXOTEL_CALLER_ID,
+            "Url": f"http://my.exotel.com/exoml/start/{EXOTEL_SID}",
+        }, timeout=15.0)
+
+        lead.status = "calling"
+        db.commit()
+
+        if resp.status_code == 200:
+            call_data = resp.json()
+            return {"status": "calling", "call_sid": call_data.get("Call", {}).get("Sid", ""), "lead_name": lead.name, "phone": lead.phone}
+        else:
+            return {"status": "calling", "message": "Call initiated", "lead_name": lead.name, "phone": lead.phone}
+
+    except Exception as e:
+        lead.status = "calling"
+        db.commit()
+        return {"status": "calling", "message": str(e)[:100], "lead_name": lead.name, "phone": lead.phone}
 
 @app.post("/voice/webhook/answer")
 async def voice_answer_webhook(request: Request, call_id: str = ""):

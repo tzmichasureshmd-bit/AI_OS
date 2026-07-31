@@ -545,67 +545,46 @@ Other companies integrate our AI voice into THEIR apps.
 
 ---
 
-## 18. Daily Progress Log
+## 18. Where Everything Is
 
-### Day 1 (July 22, 2026)
-- Full project audit of old codebase
-- Designed TZMICHA AI OS architecture
-- Built Voice AI Engine (all providers)
-- Built Conversation Engine, Memory, Language Detection
-- Built RAG Knowledge Engine + Workflow Engine
-- Got API keys: Groq, Deepgram, ElevenLabs
-- All APIs verified working
-- Professional project structure created
-- Pushed to GitHub: github.com/Tzmicha/AI_OS
-
-### Day 2 (July 23, 2026)
-- Fixed audio playback (Windows MCI)
-- Tested ElevenLabs voices (audio cutoff issue)
-- Voice quality improvements (prompts, settings)
-
-### Day 3 (July 27, 2026)
-- Discovered Sarvam AI (perfect Indian language voices)
-- Integrated Sarvam AI TTS (Rs.0.45/min, native Telugu)
-- Tested all 37 voices — selected Suhani for Telugu
-- Fixed sentence cutoff (max_tokens + auto-trim)
-- LLM now generates Telugu in native script
-- Updated documentation for MD review
-
-### Day 4-8 (July 28-30, 2026)
-- Built complete FastAPI backend (30+ endpoints)
-- Built React 19 frontend dashboard (10 pages)
-- Integrated call simulator with AI
-- Built real voice calling system (Twilio + WebSocket)
-- Built team management with role-based permissions
-- Built AI Employees management (create, configure, deploy)
-- Built campaign management
-- Built super admin panel
-- Added dark/light theme
-- Added animated charts and stats
-- Full multi-tenant SaaS architecture working
-- Both servers running and tested
+| What | Location |
+|------|----------|
+| Live Dashboard | https://voice.tzmicha.com |
+| API Docs | https://voice.tzmicha.com/docs |
+| GitHub Repo | https://github.com/tzmichasureshmd-bit/AI_OS |
+| VPS | Hostinger (Mumbai) srv1836017 |
+| Domain | voice.tzmicha.com (A record → VPS IP) |
+| Daily Progress | DAILY_PROGRESS.md (separate file) |
 
 ---
 
 ## 19. SUMMARY FOR MD (Quick Read)
 
-### What's DONE:
-- Complete SaaS platform (backend + frontend + voice engine)
-- 30+ API endpoints working
-- 10-page dashboard (professional, dark theme, animated)
-- AI Call Simulator (text + voice)
-- Real phone calling capability (Twilio)
-- Multi-language AI (Telugu, Hindi, English)
-- Team management with roles & permissions
-- Lead scoring & categorization (hot/warm/cold)
-- Campaign management
-- CSV import/export
-- Docker deployment ready
+### What's DONE (8 Days of Work):
+
+**Day 1-2:** Voice AI Engine built (multilingual, natural human voice)
+**Day 3:** Sarvam AI integrated (perfect Telugu/Hindi, 37 voices tested)
+**Day 4-5:** Full SaaS backend (30+ APIs) + React dashboard (10 pages)
+**Day 6:** Team management, roles, permissions, AI Employees, Admin panel
+**Day 7:** Real phone calling working (Exotel + Sarvam AI + Pipecat)
+**Day 8:** Deployed to production → **https://voice.tzmicha.com** (LIVE)
+
+### Live URLs:
+- **Dashboard:** https://voice.tzmicha.com
+- **API Docs:** https://voice.tzmicha.com/docs
+
+### Technology (Final Stack):
+- **AI Brain:** Groq + LLaMA 3.3 70B (FREE, 0.8s response)
+- **AI Voice:** Sarvam AI (native Telugu/Hindi, Rs.0.45/min)
+- **Phone Calls:** Exotel (Indian numbers, WebSocket streaming)
+- **Backend:** FastAPI (Python) — 30+ endpoints
+- **Frontend:** React 19 + Vite — 10 pages, dark theme, animated
+- **Hosting:** Docker on Hostinger VPS (Mumbai)
+- **SSL:** Traefik (auto HTTPS)
 
 ### What's REMAINING:
-- Deploy to production server (1-2 days)
-- Connect custom domain
-- Add Razorpay billing integration
+- Connect Exotel phone number to live server (1 day)
+- Add Razorpay billing integration (2-3 days)
 - Find 5 beta customers
 
 ### Revenue Potential:
@@ -618,12 +597,15 @@ Other companies integrate our AI voice into THEIR apps.
 - 1/10th cost of human telecallers
 - Full SaaS dashboard (not just API)
 - Works 24/7, handles unlimited simultaneous calls
+- Real phone calling with Exotel (Indian numbers)
 
 ---
 
-**GitHub:** https://github.com/Tzmicha/AI_OS
+**GitHub:** https://github.com/tzmichasureshmd-bit/AI_OS
+**Live:** https://voice.tzmicha.com
+**Daily Progress:** See DAILY_PROGRESS.md (separate file)
 
 ---
 
 *Last Updated: July 30, 2026*
-*Backend: http://localhost:8000 | Frontend: http://localhost:3000*
+*Backend: https://voice.tzmicha.com/api | Frontend: https://voice.tzmicha.com*

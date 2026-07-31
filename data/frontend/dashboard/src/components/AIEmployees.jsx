@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { useState, useEffect } from 'react'
-import { Plus, Bot, Phone, Globe, Mic, X, Play, Pause, Settings, Trash2 } from 'lucide-react'
+import { Plus, Bot, Phone, Globe, Mic, X, Play, Pause, Settings, Trash2, Link2 } from 'lucide-react'
 import api from '../api'
 
 const VOICES = [
@@ -24,6 +24,8 @@ export default function AIEmployees() {
   const [employees, setEmployees] = useState([])
   const [showCreate, setShowCreate] = useState(false)
   const [showScript, setShowScript] = useState(null)
+  const [analyzingUrl, setAnalyzingUrl] = useState(false)
+  const [urlInput, setUrlInput] = useState('')
   const [form, setForm] = useState({
     name: '',
     role: '',
@@ -46,6 +48,31 @@ export default function AIEmployees() {
   const saveEmployees = (list) => {
     setEmployees(list)
     localStorage.setItem('ai_employees', JSON.stringify(list))
+  }
+
+  const analyzeURL = async () => {
+    if (!urlInput.trim()) return
+    setAnalyzingUrl(true)
+    try {
+      const res = await api.post('/ai/analyze-url', { url: urlInput.trim() })
+      if (res.data.status === 'success') {
+        const d = res.data.data
+        setForm({
+          ...form,
+          company_name: d.company_name || '',
+          company_info: d.products || '',
+          industry: d.industry || '',
+          greeting: d.greeting || '',
+          script: d.script || '',
+          goals: d.goals || '',
+          role: 'AI Sales Executive',
+          name: 'Priya',
+        })
+      }
+    } catch (err) {
+      alert('Could not analyze URL. Check if the website is accessible.')
+    }
+    setAnalyzingUrl(false)
   }
 
   const createEmployee = () => {
@@ -158,6 +185,20 @@ export default function AIEmployees() {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {/* URL Auto-Analyze */}
+                <div style={{ padding: '16px', borderRadius: '10px', background: 'linear-gradient(135deg, rgba(6,182,212,0.05), rgba(6,182,212,0.1))', border: '1px solid rgba(6,182,212,0.2)' }}>
+                  <p style={{ fontSize: '11px', fontWeight: '600', color: '#06b6d4', textTransform: 'uppercase', marginBottom: '8px' }}>Quick Setup - Paste Website URL</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px' }}>AI will read the website and auto-generate everything</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input type="url" placeholder="https://company-website.com" value={urlInput} onChange={e => setUrlInput(e.target.value)} className="input" style={{ flex: 1 }} />
+                    <button onClick={analyzeURL} disabled={analyzingUrl || !urlInput.trim()} className="btn btn-primary" style={{ whiteSpace: 'nowrap', opacity: (analyzingUrl || !urlInput.trim()) ? 0.5 : 1 }}>
+                      {analyzingUrl ? 'Analyzing...' : 'Auto-Fill'}
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-dim)' }}>— or fill manually —</div>
+
                 {/* Identity */}
                 <p style={{ fontSize: '11px', fontWeight: '600', color: 'var(--accent-light)', textTransform: 'uppercase', marginTop: '8px' }}>Identity</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
